@@ -101,8 +101,8 @@ class PoseTracker:
         # Initialize MediaPipe
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(model_complexity=1, smooth_landmarks=True)
-        self.cap = cv2.VideoCapture('test.mp4') # Or your video path
-        
+        # self.cap = cv2.VideoCapture("https://192.168.100.229:8080/video") # Or your video path
+        self.cap = cv2.VideoCapture("test.mp4") # Or your video path
         # EMA and Calibration settings
         self.EMA_ALPHA = 0.15
         self.base_floor_y = None
@@ -112,7 +112,7 @@ class PoseTracker:
         self.root = Entity()
 
         # Create Joints (Attached to Root)
-        self.head = self.create_joint(color.white, s=0.8)
+        self.head,_ = self.create_joint(color.white, s=0.8)
         self.r_sh, self.torso = self.create_joint(); self.l_sh, _ = self.create_joint()
         self.r_el, self.r_b1 = self.create_joint(color.green); self.l_el, self.l_b1 = self.create_joint(color.green)
         self.r_wr, self.r_b2 = self.create_joint(color.red); self.l_wr, self.l_b2 = self.create_joint(color.red)
@@ -132,7 +132,17 @@ class PoseTracker:
 
     def update_pose(self):
         ret, frame = self.cap.read()
-        if not ret: return
+        # --- NEW LOOPING LOGIC ---
+        # If 'ret' is False, the video has reached the end.
+        if not ret: 
+            # Rewind the video back to frame position 0
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            # Read the very first frame again to keep the loop moving
+            ret, frame = self.cap.read()
+            
+            # If it STILL fails, the file might be missing or corrupted, so we safely exit
+            if not ret: 
+                return
         
         frame = cv2.flip(frame, 1)
         res = self.pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -145,10 +155,10 @@ class PoseTracker:
         if self.base_floor_y is None: self.base_floor_y = current_lowest
 
         mapping = [
-            (0, self.head), (12, self.r_sh), (11, self.l_sh), (14, self.r_el), 
-            (13, self.l_el), (16, self.r_wr), (15, self.l_wr), (24, self.r_hp), 
-            (23, self.l_hp), (26, self.r_kn), (25, self.l_kn), (28, self.r_ak), (27, self.l_ak)
-        ]
+        (0, self.head), (12, self.r_sh), (11, self.l_sh), (14, self.r_el), 
+        (13, self.l_el), (16, self.r_wr), (15, self.l_wr), (24, self.r_hp), 
+        (23, self.l_hp), (26, self.r_kn), (25, self.l_kn), (28, self.r_ak), (27, self.l_ak)
+    ]
 
         for id, ent in mapping:
             if lm[id].visibility > 0.6:
